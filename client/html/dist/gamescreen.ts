@@ -1,7 +1,10 @@
 import {CanvasController} from './canvas.js';
-import type {DrawCommand} from "./canvas.js"
+import type {DrawCommand, Point} from "./canvas.js"
+
+import { DebrisController } from './debris.js';
 
 export class gamescreenView {
+    debris: DebrisController;
     canvas: CanvasController;
     _elements: Record<string, any>;
     set elements(input: Record<string, any>) {
@@ -20,7 +23,15 @@ export class gamescreenView {
         this.preloadEarthImages();
         setTimeout(this.drawEarth.bind(this), 1000);
 
+        setTimeout(this.spawnDebris.bind(this), 1000);
+
         this.animate(0);
+    }
+
+    spawnDebris() {
+        setTimeout(this.spawnDebris.bind(this), Math.random()*10000);
+        const debrisRecord = this.debris.spawnDebris();
+        this.canvas.drawImage(
     }
 
     lastTimestamp: number = 0;
@@ -45,9 +56,12 @@ export class gamescreenView {
         this.canvas.ctx.drawImage(...item.slice(0,5));
     };
 
-    getElements(): {canvas: CanvasController} {
+    getElements(): {canvas: CanvasController, debris: DebrisController} {
+        const canvas = this.canvas = new CanvasController();
+        const debris = this.debris = new DebrisController();
         return {
-            canvas: this.canvas = new CanvasController()
+            canvas,
+            debris,
         }
     }
 
@@ -59,6 +73,7 @@ export class gamescreenView {
     earthSecondsPassed: number = 0;
     earthFrame: number = 0;
     earthImages: HTMLImageElement[] = [];
+    earthPosition: Point = {x: 7680, y: 7680};
     drawEarth() {
         this.earthSecondsToRotation = this.elements.canvas.canvas.width / 20;
 
@@ -71,7 +86,13 @@ export class gamescreenView {
             }
         }.bind(this);
 
-        this.elements.canvas.drawImage("/media/earth/frame-00.png", 7680, 7680, 1, fn);
+        this.elements.canvas.drawImage(
+            "/media/earth/frame-00.png",
+            this.earthPosition.x,
+            this.earthPosition.y,
+            1,
+            fn
+        );
     }
 
     preloadEarthImages() {
