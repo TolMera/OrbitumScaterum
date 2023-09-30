@@ -17,7 +17,8 @@ export class gamescreenView {
 
     constructor() {
         this.drawBackground();
-        this.drawEarth();
+        this.preloadEarthImages();
+        setTimeout(this.drawEarth.bind(this), 1000);
 
         this.animate(0);
     }
@@ -41,7 +42,7 @@ export class gamescreenView {
         const fn:Function = item.slice(-1)[0] as unknown as Function;
         fn(item, delta);
         // @ts-ignore
-        this.canvas.ctx.drawImage(...item.slice(0,5))
+        this.canvas.ctx.drawImage(...item.slice(0,5));
     };
 
     getElements(): {canvas: CanvasController} {
@@ -51,25 +52,41 @@ export class gamescreenView {
     }
 
     drawBackground() {
-        this.elements.canvas.drawBackground('/media/constelation.background.png')
+        this.elements.canvas.drawBackground('/media/constelation.background.png');
     }
 
     earthSecondsToRotation: number = 0;
     earthSecondsPassed: number = 0;
     earthFrame: number = 0;
+    earthImages: HTMLImageElement[] = [];
     drawEarth() {
-        const framePath = "/media/earth/frame-";
-        this.earthSecondsToRotation = this.getElements().canvas.canvas.width / 20;
-        const earth = this.elements.canvas.drawImage(`${framePath}00.png`, 7680, 7680)
-        earth[5] = (item: DrawCommand, time: number) => {
+        this.earthSecondsToRotation = this.elements.canvas.canvas.width / 20;
+
+        const fn = function (item: DrawCommand, time: number): boolean {
             this.earthSecondsPassed += time;
             if (this.earthSecondsPassed > this.earthSecondsToRotation) {
                 if (++this.earthFrame > 19) this.earthFrame = 0;
                 this.earthSecondsPassed -= this.earthSecondsToRotation;
-                const img = this.canvas.getImage(`${framePath}${this.earthFrame.toString().padStart(2, "0")}.png`);
+                item[0] = this.earthImages[this.earthFrame];
             }
+        }.bind(this);
+
+        this.elements.canvas.drawImage("/media/earth/frame-00.png", 7680, 7680, 1, fn);
+    }
+
+    preloadEarthImages() {
+        const framePath = "/media/earth/frame-";
+        for (let i = 0; i < 20; i++) {
+            const index = i;
+            const earthImages = this.earthImages;
+            const img = this.elements.canvas.getImage(`${framePath}${index.toString().padStart(2, "0")}.png`);
+            img.onload = () => { earthImages[index] = img; }
         }
     }
 }
 
-new gamescreenView()
+try {
+    new gamescreenView();
+} catch (error: unknown) {
+    console.error(error);
+}
