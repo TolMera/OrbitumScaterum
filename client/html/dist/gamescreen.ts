@@ -1,5 +1,5 @@
-import {CanvasController} from './canvas.js';
-import type {DrawCommand, Point} from "./canvas.js"
+import { CanvasController } from './canvas.js';
+import type { DrawCommand, Point } from "./canvas.js"
 
 import { DebrisController } from './debris.js';
 import type { DebrisRecord } from './debris.js';
@@ -32,25 +32,35 @@ export class gamescreenView {
     }
 
     spawnDebris() {
-        setTimeout(this.spawnDebris.bind(this), Math.random()*1000);
-        const debrisRecord = this.debris.spawnDebris();
-        const img = this.rockImages[Math.ceil(Math.random()*10)];
-        this.canvas.drawImage(
-            img,
-            this.earthPosition.x + debrisRecord.point.x,
-            this.earthPosition.y,
-            .05,
-            function(item: DrawCommand, time: number) {
-                debrisRecord.update(time*.001);
-                item[1] = this.earthPosition.x + debrisRecord.point.x;
-                item[2] = this.earthPosition.y + debrisRecord.point.y;
-            }.bind(this)
+        const SpawnDebrisRate = 1000;
+        const MaxDebris = 1000;
+        const OrbitSpeedFactor = 0.00005;
+
+        setTimeout(
+            this.spawnDebris.bind(this),
+            Math.random() * SpawnDebrisRate
         );
 
-        this.debrisRecords.push([
-            debrisRecord,
-            this.canvas.drawList[this.canvas.drawList.length-1]
-        ]);
+        if (this.debrisRecords.length < MaxDebris) {
+            const debrisRecord = this.debris.spawnDebris();
+            const img = this.rockImages[Math.ceil(Math.random() * this.rockImages.length)];
+            this.canvas.drawImage(
+                img,
+                this.earthPosition.x + debrisRecord.point.x,
+                this.earthPosition.y,
+                .05,
+                function (item: DrawCommand, time: number) {
+                    debrisRecord.update(time * OrbitSpeedFactor);
+                    item[1] = this.earthPosition.x + debrisRecord.point.x;
+                    item[2] = this.earthPosition.y + debrisRecord.point.y;
+                }.bind(this)
+            );
+
+            this.debrisRecords.push([
+                debrisRecord,
+                this.canvas.drawList[this.canvas.drawList.length - 1]
+            ]);
+        }
     }
 
     lastTimestamp: number = 0;
@@ -67,15 +77,15 @@ export class gamescreenView {
         requestAnimationFrame(this.animate.bind(this));
     }
 
-    drawIt(drawCmd:DrawCommand, delta: number) {
+    drawIt(drawCmd: DrawCommand, delta: number) {
         let item = drawCmd as unknown as DrawCommand;
-        const fn:Function = item.slice(-1)[0] as unknown as Function;
+        const fn: Function = item.slice(-1)[0] as unknown as Function;
         fn(item, delta);
         // @ts-ignore
-        this.canvas.ctx.drawImage(...item.slice(0,5));
+        this.canvas.ctx.drawImage(...item.slice(0, 5));
     };
 
-    getElements(): {canvas: CanvasController, debris: DebrisController} {
+    getElements(): { canvas: CanvasController, debris: DebrisController } {
         const canvas = this.canvas = new CanvasController();
         const debris = this.debris = new DebrisController();
         return {
@@ -92,7 +102,7 @@ export class gamescreenView {
     earthSecondsPassed: number = 0;
     earthFrame: number = 0;
     earthImages: HTMLImageElement[] = [];
-    earthPosition: Point = {x: 7680, y: 7680};
+    earthPosition: Point = { x: 7680, y: 7680 };
     drawEarth() {
         this.earthSecondsToRotation = this.elements.canvas.canvas.width / 20;
 
