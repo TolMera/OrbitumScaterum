@@ -1,7 +1,12 @@
-import {CanvasController} from './canvas.js';
-import type {DrawCommand} from "./canvas.js"
+import { CanvasController } from './canvas.js';
+import type { DrawCommand, Point } from "./canvas.js"
+
+import { DebrisController } from './debris.js';
+import type { DebrisRecord } from './debris.js';
 
 export class gamescreenView {
+    debris: DebrisController;
+    debrisRecords: [DebrisRecord, unknown][] = [];
     canvas: CanvasController;
     _elements: Record<string, any>;
     set elements(input: Record<string, any>) {
@@ -18,9 +23,44 @@ export class gamescreenView {
     constructor() {
         this.drawBackground();
         this.preloadEarthImages();
-        setTimeout(this.drawEarth.bind(this), 1000);
+        setTimeout(this.drawEarth.bind(this), 5000);
+
+        this.preloadRockImages();
+        setTimeout(this.spawnDebris.bind(this), 5000);
 
         this.animate(0);
+    }
+
+    spawnDebris() {
+        const SpawnDebrisRate = 1000;
+        const MaxDebris = 1000;
+        const OrbitSpeedFactor = 0.00005;
+
+        setTimeout(
+            this.spawnDebris.bind(this),
+            Math.random() * SpawnDebrisRate
+        );
+
+        if (this.debrisRecords.length < MaxDebris) {
+            const debrisRecord = this.debris.spawnDebris();
+            const img = this.rockImages[Math.ceil(Math.random() * this.rockImages.length)];
+            this.canvas.drawImage(
+                img,
+                this.earthPosition.x + debrisRecord.point.x,
+                this.earthPosition.y,
+                .05,
+                function (item: DrawCommand, time: number) {
+                    debrisRecord.update(time * OrbitSpeedFactor);
+                    item[1] = this.earthPosition.x + debrisRecord.point.x;
+                    item[2] = this.earthPosition.y + debrisRecord.point.y;
+                }.bind(this)
+            );
+
+            this.debrisRecords.push([
+                debrisRecord,
+                this.canvas.drawList[this.canvas.drawList.length - 1]
+            ]);
+        }
     }
 
     lastTimestamp: number = 0;
@@ -37,17 +77,20 @@ export class gamescreenView {
         requestAnimationFrame(this.animate.bind(this));
     }
 
-    drawIt(drawCmd:DrawCommand, delta: number) {
+    drawIt(drawCmd: DrawCommand, delta: number) {
         let item = drawCmd as unknown as DrawCommand;
-        const fn:Function = item.slice(-1)[0] as unknown as Function;
+        const fn: Function = item.slice(-1)[0] as unknown as Function;
         fn(item, delta);
         // @ts-ignore
-        this.canvas.ctx.drawImage(...item.slice(0,5));
+        this.canvas.ctx.drawImage(...item.slice(0, 5));
     };
 
-    getElements(): {canvas: CanvasController} {
+    getElements(): { canvas: CanvasController, debris: DebrisController } {
+        const canvas = this.canvas = new CanvasController();
+        const debris = this.debris = new DebrisController();
         return {
-            canvas: this.canvas = new CanvasController()
+            canvas,
+            debris,
         }
     }
 
@@ -59,6 +102,7 @@ export class gamescreenView {
     earthSecondsPassed: number = 0;
     earthFrame: number = 0;
     earthImages: HTMLImageElement[] = [];
+    earthPosition: Point = { x: 7680, y: 7680 };
     drawEarth() {
         this.earthSecondsToRotation = this.elements.canvas.canvas.width / 20;
 
@@ -71,7 +115,14 @@ export class gamescreenView {
             }
         }.bind(this);
 
-        this.elements.canvas.drawImage("/media/earth/frame-00.png", 7680, 7680, 1, fn);
+        this.elements.canvas.drawImage(
+            this.earthImages[0],
+            this.earthPosition.x,
+            this.earthPosition.y,
+            1,
+            fn
+        );
+        console.log("Draw Earth");
     }
 
     preloadEarthImages() {
@@ -81,6 +132,17 @@ export class gamescreenView {
             const earthImages = this.earthImages;
             const img = this.elements.canvas.getImage(`${framePath}${index.toString().padStart(2, "0")}.png`);
             img.onload = () => { earthImages[index] = img; }
+        }
+    }
+
+    rockImages: HTMLImageElement[] = [];
+    preloadRockImages() {
+        const framePath = "/media/rocks/";
+        for (let i = 1; i <= 10; i++) {
+            const index = i;
+            const rockImages = this.rockImages;
+            const img = this.elements.canvas.getImage(`${framePath}${index.toString()}.png`);
+            img.onload = () => { rockImages[index] = img; }
         }
     }
 }
