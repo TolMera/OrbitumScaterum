@@ -1,0 +1,17 @@
+{
+  "name": "orbitumscaterum",
+  "version": "0.0.0",
+  "description": "An orbital debris game",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TolMera/OrbitumScaterum.git"
+  },
+  "author": "Bjorn Macintosh (c)",
+  "bugs": {
+    "url": "https://github.com/TolMera/OrbitumScaterum/issues"
+  },
+  "homepage": "https://github.com/TolMera/OrbitumScaterum#readme"
+}
