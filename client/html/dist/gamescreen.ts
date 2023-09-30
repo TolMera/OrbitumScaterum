@@ -2,9 +2,11 @@ import {CanvasController} from './canvas.js';
 import type {DrawCommand, Point} from "./canvas.js"
 
 import { DebrisController } from './debris.js';
+import type { DebrisRecord } from './debris.js';
 
 export class gamescreenView {
     debris: DebrisController;
+    debrisRecords: [DebrisRecord, unknown][] = [];
     canvas: CanvasController;
     _elements: Record<string, any>;
     set elements(input: Record<string, any>) {
@@ -21,17 +23,34 @@ export class gamescreenView {
     constructor() {
         this.drawBackground();
         this.preloadEarthImages();
-        setTimeout(this.drawEarth.bind(this), 1000);
+        setTimeout(this.drawEarth.bind(this), 5000);
 
-        setTimeout(this.spawnDebris.bind(this), 1000);
+        this.preloadRockImages();
+        setTimeout(this.spawnDebris.bind(this), 5000);
 
         this.animate(0);
     }
 
     spawnDebris() {
-        setTimeout(this.spawnDebris.bind(this), Math.random()*10000);
+        setTimeout(this.spawnDebris.bind(this), Math.random()*1000);
         const debrisRecord = this.debris.spawnDebris();
+        const img = this.rockImages[Math.ceil(Math.random()*10)];
         this.canvas.drawImage(
+            img,
+            this.earthPosition.x + debrisRecord.point.x,
+            this.earthPosition.y,
+            .05,
+            function(item: DrawCommand, time: number) {
+                debrisRecord.update(time*.001);
+                item[1] = this.earthPosition.x + debrisRecord.point.x;
+                item[2] = this.earthPosition.y + debrisRecord.point.y;
+            }.bind(this)
+        );
+
+        this.debrisRecords.push([
+            debrisRecord,
+            this.canvas.drawList[this.canvas.drawList.length-1]
+        ]);
     }
 
     lastTimestamp: number = 0;
@@ -87,12 +106,13 @@ export class gamescreenView {
         }.bind(this);
 
         this.elements.canvas.drawImage(
-            "/media/earth/frame-00.png",
+            this.earthImages[0],
             this.earthPosition.x,
             this.earthPosition.y,
             1,
             fn
         );
+        console.log("Draw Earth");
     }
 
     preloadEarthImages() {
@@ -102,6 +122,17 @@ export class gamescreenView {
             const earthImages = this.earthImages;
             const img = this.elements.canvas.getImage(`${framePath}${index.toString().padStart(2, "0")}.png`);
             img.onload = () => { earthImages[index] = img; }
+        }
+    }
+
+    rockImages: HTMLImageElement[] = [];
+    preloadRockImages() {
+        const framePath = "/media/rocks/";
+        for (let i = 1; i <= 10; i++) {
+            const index = i;
+            const rockImages = this.rockImages;
+            const img = this.elements.canvas.getImage(`${framePath}${index.toString()}.png`);
+            img.onload = () => { rockImages[index] = img; }
         }
     }
 }
