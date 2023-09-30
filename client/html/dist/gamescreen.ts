@@ -62,7 +62,7 @@ export class gamescreenView {
     drawEarth() {
         this.earthSecondsToRotation = this.elements.canvas.canvas.width / 20;
 
-        const fn = function (item: DrawCommand, time: number): boolean {
+        const fn = function (item: DrawCommand, time: number) {
             this.earthSecondsPassed += time;
             if (this.earthSecondsPassed > this.earthSecondsToRotation) {
                 if (++this.earthFrame > 19) this.earthFrame = 0;
