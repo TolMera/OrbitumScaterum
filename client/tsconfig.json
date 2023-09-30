@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "module": "commonjs",
-    "outDir": "./dist",
+    "target": "ES2020",   // Output as ES6
+    "module": "esnext", // Use ES module syntax
+    "moduleResolution": "node",
+    // "outDir": "./html/dist",
     "sourceMap": true
   },
   "include": [
-    "src/**/*.ts"
+    "html/**/*.ts"
   ],
   "exclude": [
     "node_modules"
