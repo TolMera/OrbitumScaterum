@@ -6,6 +6,27 @@ export class DebrisController {
 	spawnDebris() {
 		return this.model.newDebris();
 	}
+
+	collision(p1: DebrisRecord, p2: DebrisRecord) {
+		let main: DebrisRecord;
+		let second: DebrisRecord;
+		if (p1.mass > p2.mass) {
+			main = p1;
+			second = p2;
+		} else {
+			main = p2;
+			second = p1;
+		}
+
+		const totalMass = main.mass + second.mass;
+		main.vector.x = (second.vector.x * (second.mass/totalMass)) + (main.vector.x * (main.mass/totalMass));
+		second.vector.x = 0;
+		main.vector.y = (second.vector.y * (second.mass/totalMass)) + (main.vector.y * (main.mass/totalMass));
+		second.vector.y = 0;
+
+		main.mass += second.mass;
+		second.mass = 0;
+	}
 }
 
 type Vector = Point;
@@ -14,9 +35,10 @@ const G = 6.6743e-11;
 const M = 5.972e24;
 
 export type DebrisRecord = {
+	type: string,
 	point: Point;
 	vector: Vector;
-	speed: number;
+	// speed: number;
 	mass: number;
 	update: Function;
 	complete: Function;
@@ -37,7 +59,6 @@ export class DebrisModel {
 				Math.sqrt((G * M) / Math.abs(point.x)) *
 				(Math.random() > 0.5 ? -1 : 1),
 		};
-		const speed: number = (G * M) / (point.x - 7680);
 		const mass = Math.max(2, Number((Math.random() * 1000).toFixed(0)));
 
 		const update = function (time: number) {
@@ -54,9 +75,9 @@ export class DebrisModel {
 		};
 
 		const record = {
+			type: "debris",
 			point,
 			vector,
-			speed,
 			mass,
 			update,
 			complete: (item: DebrisRecord) => {

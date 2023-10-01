@@ -38,60 +38,62 @@ export class gamescreenView {
 	}
 
 	spawnDebris() {
-		const SpawnDebrisRate = 10;
+		const SpawnDebrisRate = 1000;
 		const MaxDebris = 1000;
-		const OrbitSpeedFactor = 0.00005;
+		const OrbitSpeedFactor = 0.00001;
 
 		setTimeout(
 			this.spawnDebris.bind(this),
 			Math.random() * SpawnDebrisRate,
 		);
 
-		if (this.debrisRecords.length < MaxDebris) {
-			const debrisRecord = this.debris.spawnDebris();
-			const img =
-				this.rockImages[
-					Math.ceil(Math.random() * this.rockImages.length)
-				];
-			const scale = 0.05;
+		if (this.canvas.drawList.length > MaxDebris) return;
 
-			this.canvas.drawImage(
-				img,
-				this.earthPosition.x + debrisRecord.point.x,
-				this.earthPosition.y,
-				scale,
-				function (item: DrawCommand, time: number) {
-					debrisRecord.update(time * OrbitSpeedFactor);
-					item[1] =
-						this.earthPosition.x +
-						(debrisRecord.point.x - (img.width / 2) * scale);
-					item[2] =
-						this.earthPosition.y +
-						(debrisRecord.point.y - (img.height / 2) * scale);
+		const debrisRecord = this.debris.spawnDebris();
+		const img =
+			this.rockImages[
+				Math.ceil(Math.random() * this.rockImages.length)
+			];
+		const scale = 0.05 * Math.cbrt(debrisRecord.mass/10);
 
-					this.entry.simulate(item, time, debrisRecord, [
-						// AList of objects with which we are testing Entry
-						{
-							point: this.earthPosition,
-							diameter: this.earthImages[0].width,
-						},
-					]);
+		this.canvas.drawImage(
+			img,
+			this.earthPosition.x + debrisRecord.point.x,
+			this.earthPosition.y,
+			scale,
+			function (item: DrawCommand, time: number) {
+				debrisRecord.update(time * OrbitSpeedFactor);
+				item[1] =
+					this.earthPosition.x +
+					(debrisRecord.point.x - (img.width / 2) * scale);
+				item[2] =
+					this.earthPosition.y +
+					(debrisRecord.point.y - (img.height / 2) * scale);
+				item[3] = img.width * 0.05 * Math.cbrt(debrisRecord.mass/10);
+				item[4] = img.height * 0.05 * Math.cbrt(debrisRecord.mass/10);
 
-					if (debrisRecord.mass <= 1) {
-						this.canvas.ctx.fillStyle = "orange";
-						const size = img.width * scale * 2;
+				this.entry.simulate(item, time, debrisRecord, [
+					// AList of objects with which we are testing Entry
+					{
+						point: this.earthPosition,
+						diameter: this.earthImages[0].width,
+					},
+				]);
 
-						this.canvas.ctx.fillRect(
-							item[1] - (img.width * scale) / 2,
-							item[2] - (img.width * scale) / 2,
-							size,
-							size,
-						);
-					}
-				}.bind(this),
-				debrisRecord,
-			);
-		}
+				if (debrisRecord.mass <= 1) {
+					this.canvas.ctx.fillStyle = "orange";
+					const size = img.width * scale * 2;
+
+					this.canvas.ctx.fillRect(
+						item[1] - (img.width * scale) / 2,
+						item[2] - (img.width * scale) / 2,
+						size,
+						size,
+					);
+				}
+			}.bind(this),
+			debrisRecord,
+		);
 	}
 
 	lastTimestamp: number = 0;
@@ -108,6 +110,18 @@ export class gamescreenView {
 				if (drawCmd[6].complete(drawCmd[6])) {
 					deleteList.push(drawCmdIndex);
 				} else {
+					const thisDiam = (drawCmd[0].width * 0.05 * Math.cbrt(drawCmd[6].mass/10));
+					for (let otherIndex = Number(drawCmdIndex)+1; Number(otherIndex) < this.canvas.drawList.length; otherIndex++) {
+						const other = this.canvas.drawList[otherIndex];
+						// if (drawCmd[6] === other[6]) continue;
+						if (other[6] && other[6].type === "debris") {
+							const otherDiam = (other[0].width * 0.05 * Math.cbrt(other[6].mass/10));
+							const distance = Math.sqrt(Math.pow(other[1] - drawCmd[1], 2) + Math.pow(other[2] - drawCmd[2], 2));
+							if (distance < otherDiam + thisDiam) {
+								this.debris.collision(drawCmd[6], other[6]);
+							}
+						}
+					}
 					this.drawIt(drawCmd, delta);
 				}
 			} else {
@@ -116,7 +130,7 @@ export class gamescreenView {
 		}
 		for (let index of deleteList) this.canvas.drawList.splice(index, 1);
 
-		// console.log("Object Count:", this.canvas.drawList.length, "background:", this.canvas.backgroundDrawList.length);
+		console.log("Object Count:", this.canvas.drawList.length, "background:", this.canvas.backgroundDrawList.length);
 
 		requestAnimationFrame(this.animate.bind(this));
 	}

@@ -18,7 +18,6 @@ export class EntryController {
 			const atmoRadius = radius * BurnupStartsAt - radius;
 			if (distance < radius) {
 				record.mass = 0.1;
-				console.log("Colission");
 			}
 			if (distance - radius < atmoRadius) {
 				const depth = distance - radius;
@@ -38,10 +37,6 @@ export class EntryController {
 				const scalingFactor = newMagnitude / magnitude;
 				record.vector.x *= scalingFactor;
 				record.vector.y *= scalingFactor;
-
-				if (record.mass < 1) {
-					console.log("Burned up");
-				}
 			}
 		}
 	}
