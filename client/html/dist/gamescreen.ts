@@ -4,11 +4,14 @@ import type { DrawCommand, Point } from "./canvas.js"
 import { DebrisController } from './debris.js';
 import type { DebrisRecord } from './debris.js';
 
+import { EntryController } from './entry.js';
+
 export class gamescreenView {
     debris: DebrisController;
     debrisRecords: [DebrisRecord, unknown][] = [];
     canvas: CanvasController;
     _elements: Record<string, any>;
+    entry: EntryController;
     set elements(input: Record<string, any>) {
         // Can not set elements twice
         if (this._elements) throw new Error("d9111137-23c6-51d9-8cbd-ee51e852bbf5");
@@ -32,8 +35,8 @@ export class gamescreenView {
     }
 
     spawnDebris() {
-        const SpawnDebrisRate = 1000;
-        const MaxDebris = 1000;
+        const SpawnDebrisRate = 10;
+        const MaxDebris = 100000;
         const OrbitSpeedFactor = 0.00005;
 
         setTimeout(
@@ -44,15 +47,45 @@ export class gamescreenView {
         if (this.debrisRecords.length < MaxDebris) {
             const debrisRecord = this.debris.spawnDebris();
             const img = this.rockImages[Math.ceil(Math.random() * this.rockImages.length)];
+
             this.canvas.drawImage(
                 img,
                 this.earthPosition.x + debrisRecord.point.x,
                 this.earthPosition.y,
-                .05,
+                .05 * Math.max(Math.random(), 0.5),
                 function (item: DrawCommand, time: number) {
                     debrisRecord.update(time * OrbitSpeedFactor);
                     item[1] = this.earthPosition.x + debrisRecord.point.x;
                     item[2] = this.earthPosition.y + debrisRecord.point.y;
+
+                    this.entry.simulate(
+                        item,
+                        time,
+                        debrisRecord,
+                        [ // AList of objects with which we are testing Entry
+                            { point: this.earthPosition, diameter: this.earthImages[0].width }
+                        ]
+                    );
+
+                    if (debrisRecord.mass < 1) {
+                        const recordRecord: [DebrisRecord, unknown] = this.debrisRecords.find((hay:[DebrisRecord, unknown]) => hay[0] === debrisRecord);
+                        let recordFlag = -1;
+                        for (const recordIndex of this.debrisRecords) {
+                            if (this.debrisRecords[recordIndex] === debrisRecord) {
+                                recordFlag = recordIndex;
+                                let drawFlag: number = -1;
+                                for (const drawIndex in this.canvas.drawList) {
+                                    if (this.canvas.drawList[drawIndex] === recordRecord[1]) {
+                                        drawFlag = Number(drawIndex);
+                                        break;
+                                    }
+                                }
+                                if (drawFlag !== -1) this.canvas.drawList.splice(drawFlag, 1);
+                                break;
+                            }
+                        }
+                        if (recordFlag === -1) this.debrisRecords.splice(recordFlag, 1);
+                    }
                 }.bind(this)
             );
 
@@ -74,6 +107,8 @@ export class gamescreenView {
             this.drawIt(drawCmd, delta);
         }
 
+        // console.log("Object Count:", this.canvas.drawList.length, "background:", this.canvas.backgroundDrawList.length);
+
         requestAnimationFrame(this.animate.bind(this));
     }
 
@@ -85,12 +120,18 @@ export class gamescreenView {
         this.canvas.ctx.drawImage(...item.slice(0, 5));
     };
 
-    getElements(): { canvas: CanvasController, debris: DebrisController } {
+    getElements(): {
+        canvas: CanvasController;
+        debris: DebrisController;
+        entry: EntryController;
+    } {
         const canvas = this.canvas = new CanvasController();
         const debris = this.debris = new DebrisController();
+        const entry = this.entry = new EntryController();
         return {
             canvas,
             debris,
+            entry,
         }
     }
 

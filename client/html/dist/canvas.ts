@@ -20,16 +20,20 @@ export class CanvasController {
 
     drawImage(filePath: string | HTMLImageElement, x: number, y: number, scale: number = 1, fn: Function = () => { }): DrawCommand {
         const img = typeof filePath === 'string' ? this.getImage(filePath) : filePath;
+        if (img) {
+            x -= img.width / 2;
+            y -= img.height / 2;
 
-        x -= img.width / 2;
-        y -= img.height / 2;
+            const cmd: DrawCommand = [img, x, y, img.width * scale, img.height * scale, fn];
 
-        const cmd: DrawCommand = [img, x, y, img.width * scale, img.height * scale, fn];
+            img.onload = () => { cmd[0] = img; };
+            this.drawList.push(cmd);
 
-        img.onload = () => { cmd[0] = img; };
-        this.drawList.push(cmd);
-
-        return cmd;
+            return cmd;
+        } else {
+            // TODO Fix this bug WD74
+            // setTimeout(console.log.bind(this,img), 100);
+        }
     }
 
     drawBackground(filePath: string): void {
