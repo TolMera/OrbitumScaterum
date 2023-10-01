@@ -55,12 +55,10 @@ export class gamescreenView {
                 this.earthPosition.y,
                 scale,
                 function (item: DrawCommand, time: number) {
-                    const startPoint = {x: this.debrisRecord.point.x, y: this.debrisRecord.point.y};
-                    this.debrisRecord.update(time * OrbitSpeedFactor);
-                    item[1] = this.earthPosition.x + this.debrisRecord.point.x - (this.img.width/2 * this.scale);
-                    item[2] = this.earthPosition.y + this.debrisRecord.point.y - (this.img.height/2 * this.scale);
+                    debrisRecord.update(time * OrbitSpeedFactor);
+                    item[1] = this.earthPosition.x + (debrisRecord.point.x - (img.width / 2 * scale));
+                    item[2] = this.earthPosition.y + (debrisRecord.point.y - (img.height / 2 * scale));
 
-                    const preMass = this.debrisRecord.mass;
                     this.entry.simulate(
                         item,
                         time,
@@ -69,75 +67,20 @@ export class gamescreenView {
                             { point: this.earthPosition, diameter: this.earthImages[0].width }
                         ]
                     );
-                    if (preMass !== this.debrisRecord.mass) {
-                        // Draw a tail of fire
-                        const distance = Math.sqrt(Math.abs(this.debrisRecord.point.x * this.debrisRecord.point.x) + Math.abs(this.debrisRecord.point.y * this.debrisRecord.point.y));
 
-                        // Set arc style
-                        this.canvas.ctx.strokeStyle = "rgb(255, 0, 0)"; // Red line
-                        this.canvas.ctx.lineWidth = this.img.width*this.scale;
-                        const dir = (startPoint.x * this.debrisRecord.point.y) - (this.debrisRecord.point.x * startPoint.y);
-                        const a1 = Math.atan2(this.debrisRecord.point.y - (this.img.height/2), this.debrisRecord.point.x - (this.img.width/2));
-                        const a2 = Math.atan2(this.debrisRecord.point.y - (this.img.height/2), this.debrisRecord.point.x - (this.img.width/2)) + (((this.img.width/2)*5*this.scale)/distance);
-                        const arcInput = [
-                            this.earthPosition.x,
-                            this.earthPosition.y,
-                            distance,
-                            dir < 0 ? a1 : a2,
-                            dir < 0 ? a2 : a1,
-                            dir > 0
-                        ];
-                        this.canvas.ctx.beginPath();
-                        this.canvas.ctx.arc(...arcInput);
-                        this.canvas.ctx.stroke();
+                    if (debrisRecord.mass <= 1) {
+                        this.canvas.ctx.fillStyle = "orange";
+                        const size = img.width * scale*2;
 
+                        this.canvas.ctx.fillRect(
+                            item[1]-img.width*scale/2,
+                            item[2]-img.width*scale/2,
+                            size, size
+                        );
                     }
-
-                    if (this.debrisRecord.mass < 1) {
-                        const recordRecord: [DebrisRecord, unknown] = this.debrisRecords.find((hay:[DebrisRecord, unknown]) => hay[0] === debrisRecord);
-                        let recordFlag = -1;
-                        for (const recordIndex of this.debrisRecords) {
-                            if (this.debrisRecords[recordIndex] === debrisRecord) {
-                                recordFlag = recordIndex;
-                                let drawFlag: number = -1;
-                                for (const drawIndex in this.canvas.drawList) {
-                                    if (this.canvas.drawList[drawIndex] === recordRecord[1]) {
-                                        drawFlag = Number(drawIndex);
-
-                                        // drawExplosion: {
-                                        //     this.canvas.ctx.fillStyle = "rgb(255, 200, 200)";
-                                        //     const size = 1000;
-                        
-                                        //     this.canvas.ctx.fillRect(
-                                        //         item[1],
-                                        //         item[2],
-                                        //         size, size
-                                        //     );
-                                        // }
-
-                                        break;
-                                    }
-                                }
-                                if (drawFlag !== -1) this.canvas.drawList.splice(drawFlag, 1);
-                                break;
-                            }
-                        }
-                        if (recordFlag === -1) this.debrisRecords.splice(recordFlag, 1);
-                    }
-                }.bind({
-                    earthPosition: this.earthPosition,
-                    entry: this.entry,
-                    earthImages: this.earthImages,
-                    canvas: this.canvas,
-                    debrisRecords: this.debrisRecords,
-                    debrisRecord, img, scale
-                })
-            );
-
-            this.debrisRecords.push([
-                debrisRecord,
-                this.canvas.drawList[this.canvas.drawList.length - 1]
-            ]);
+                }.bind(this),
+                debrisRecord
+            )
         }
     }
 
@@ -148,9 +91,20 @@ export class gamescreenView {
         for (let drawCmd of this.canvas.backgroundDrawList) {
             this.drawIt(drawCmd, delta);
         }
-        for (let drawCmd of this.canvas.drawList) {
-            this.drawIt(drawCmd, delta);
+        const deleteList = [];
+        for (let drawCmdIndex in this.canvas.drawList) {
+            let drawCmd = this.canvas.drawList[drawCmdIndex];
+            if (drawCmd[6]) {
+                if (drawCmd[6].complete(drawCmd[6])) {
+                    deleteList.push(drawCmdIndex);
+                } else {
+                    this.drawIt(drawCmd, delta);
+                }
+            } else {
+                this.drawIt(drawCmd, delta);
+            }
         }
+        for (let index of deleteList) this.canvas.drawList.splice(index, 1);
 
         // console.log("Object Count:", this.canvas.drawList.length, "background:", this.canvas.backgroundDrawList.length);
 
@@ -159,7 +113,7 @@ export class gamescreenView {
 
     drawIt(drawCmd: DrawCommand, delta: number) {
         let item = drawCmd as unknown as DrawCommand;
-        const fn: Function = item.slice(-1)[0] as unknown as Function;
+        const fn: Function = item[5] as unknown as Function;
         fn(item, delta);
         // @ts-ignore
         this.canvas.ctx.drawImage(...item.slice(0, 5));

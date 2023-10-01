@@ -1,4 +1,6 @@
-export type DrawCommand = [CanvasImageSource, number, number, number, number, Function];
+import { DebrisRecord } from "./debris";
+
+export type DrawCommand = [CanvasImageSource, number, number, number, number, Function, any?];
 export type Point = { x: number; y: number; }
 
 export class CanvasController {
@@ -18,13 +20,13 @@ export class CanvasController {
         this.canvas.height = 1920 * 8;
     }
 
-    drawImage(filePath: string | HTMLImageElement, x: number, y: number, scale: number = 1, fn: Function = () => { }): DrawCommand {
+    drawImage(filePath: string | HTMLImageElement, x: number, y: number, scale: number = 1, fn: Function = () => { }, model?: DebrisRecord): DrawCommand {
         const img = typeof filePath === 'string' ? this.getImage(filePath) : filePath;
         if (img) {
             x -= img.width / 2;
             y -= img.height / 2;
 
-            const cmd: DrawCommand = [img, x, y, img.width * scale, img.height * scale, fn];
+            const cmd: DrawCommand = [img, x, y, img.width * scale, img.height * scale, fn, model];
 
             img.onload = () => { cmd[0] = img; };
             this.drawList.push(cmd);
