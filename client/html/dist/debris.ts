@@ -17,11 +17,12 @@ export type DebrisRecord = {
     point: Point,
     vector: Vector,
     speed: number,
-    update: Function
+    mass: number,
+    update: Function,
 };
 
 export class DebrisModel {
-    minimumOrbit = 1_000;
+    minimumOrbit = 750;
     maximumOrbit = 7_250;
     
     newDebris() {
@@ -31,12 +32,14 @@ export class DebrisModel {
         };
         const vector: Vector = {
             x: 0,
-            y: Math.sqrt(G * M / Math.abs(point.x))
+            y: Math.sqrt(G * M / Math.abs(point.x)) * (Math.random() > 0.5 ? -1 : 1)
         };
         const speed: number = G * M / (point.x - 7680);
+        const mass = Number((Math.random() * 1000).toFixed(0));
+
         const update = function (time: number) {
           const r = Math.sqrt(point.x * point.x + point.y * point.y);
-          const a = G * M / (r * r);
+          let a = G * M / (r * r);
           
           // Update velocity using acceleration
           vector.x += (-a * point.x / r) * time;
@@ -51,7 +54,8 @@ export class DebrisModel {
             point,
             vector,
             speed,
-            update
+            mass,
+            update,
         };
 
         return record;
