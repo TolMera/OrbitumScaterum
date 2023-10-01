@@ -19,6 +19,7 @@ export type DebrisRecord = {
     speed: number,
     mass: number,
     update: Function,
+    complete: Function,
 };
 
 export class DebrisModel {
@@ -56,6 +57,10 @@ export class DebrisModel {
             speed,
             mass,
             update,
+            complete: (item: DebrisRecord) => {
+                if (item.mass < 1) return true;
+                return false;
+            }
         };
 
         return record;
