@@ -36,7 +36,7 @@ export class gamescreenView {
 
     spawnDebris() {
         const SpawnDebrisRate = 10;
-        const MaxDebris = 100000;
+        const MaxDebris = 1000;
         const OrbitSpeedFactor = 0.00005;
 
         setTimeout(
@@ -47,17 +47,20 @@ export class gamescreenView {
         if (this.debrisRecords.length < MaxDebris) {
             const debrisRecord = this.debris.spawnDebris();
             const img = this.rockImages[Math.ceil(Math.random() * this.rockImages.length)];
+            const scale = .05;
 
             this.canvas.drawImage(
                 img,
                 this.earthPosition.x + debrisRecord.point.x,
                 this.earthPosition.y,
-                .05 * Math.max(Math.random(), 0.5),
+                scale,
                 function (item: DrawCommand, time: number) {
+                    const startPoint = {x: debrisRecord.point.x, y: debrisRecord.point.y};
                     debrisRecord.update(time * OrbitSpeedFactor);
                     item[1] = this.earthPosition.x + debrisRecord.point.x;
                     item[2] = this.earthPosition.y + debrisRecord.point.y;
 
+                    const preMass = debrisRecord.mass;
                     this.entry.simulate(
                         item,
                         time,
@@ -66,6 +69,29 @@ export class gamescreenView {
                             { point: this.earthPosition, diameter: this.earthImages[0].width }
                         ]
                     );
+                    if (preMass !== debrisRecord.mass) {
+                        // Draw a tail of fire
+                        const distance = Math.sqrt(Math.abs(debrisRecord.point.x * debrisRecord.point.x) + Math.abs(debrisRecord.point.y * debrisRecord.point.y));
+
+                        // Set arc style
+                        this.canvas.ctx.strokeStyle = "rgb(255, 0, 0)"; // Red line
+                        this.canvas.ctx.lineWidth = img.width*scale;
+                        const dir = (startPoint.x * debrisRecord.point.y) - (debrisRecord.point.x * startPoint.y);
+                        const a1 = Math.atan2(debrisRecord.point.y - (img.height/2), debrisRecord.point.x - (img.width/2));
+                        const a2 = Math.atan2(debrisRecord.point.y - (img.height/2), debrisRecord.point.x - (img.width/2)) + (((img.width/2)*5*scale)/distance);
+                        const arcInput = [
+                            this.earthPosition.x,
+                            this.earthPosition.y,
+                            distance,
+                            dir < 0 ? a1 : a2,
+                            dir < 0 ? a2 : a1,
+                            dir > 0
+                        ];
+                        this.canvas.ctx.beginPath();
+                        this.canvas.ctx.arc(...arcInput);
+                        this.canvas.ctx.stroke();
+
+                    }
 
                     if (debrisRecord.mass < 1) {
                         const recordRecord: [DebrisRecord, unknown] = this.debrisRecords.find((hay:[DebrisRecord, unknown]) => hay[0] === debrisRecord);
@@ -77,6 +103,18 @@ export class gamescreenView {
                                 for (const drawIndex in this.canvas.drawList) {
                                     if (this.canvas.drawList[drawIndex] === recordRecord[1]) {
                                         drawFlag = Number(drawIndex);
+
+                                        drawExplosion: {
+                                            this.fillStyle = "rgb(255, 200, 200)";
+                                            const size = 1000;
+                        
+                                            this.canvas.ctx.fillRect(
+                                                item[1],
+                                                item[2],
+                                                size, size
+                                            );
+                                        }
+
                                         break;
                                     }
                                 }

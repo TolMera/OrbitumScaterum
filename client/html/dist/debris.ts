@@ -22,7 +22,7 @@ export type DebrisRecord = {
 };
 
 export class DebrisModel {
-    minimumOrbit = 750;
+    minimumOrbit = 650;
     maximumOrbit = 7_250;
     
     newDebris() {
