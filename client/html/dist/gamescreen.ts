@@ -4,11 +4,14 @@ import type { DrawCommand, Point } from "./canvas.js"
 import { DebrisController } from './debris.js';
 import type { DebrisRecord } from './debris.js';
 
+import { EntryController } from './entry.js';
+
 export class gamescreenView {
     debris: DebrisController;
     debrisRecords: [DebrisRecord, unknown][] = [];
     canvas: CanvasController;
     _elements: Record<string, any>;
+    entry: EntryController;
     set elements(input: Record<string, any>) {
         // Can not set elements twice
         if (this._elements) throw new Error("d9111137-23c6-51d9-8cbd-ee51e852bbf5");
@@ -32,7 +35,7 @@ export class gamescreenView {
     }
 
     spawnDebris() {
-        const SpawnDebrisRate = 1000;
+        const SpawnDebrisRate = 10;
         const MaxDebris = 1000;
         const OrbitSpeedFactor = 0.00005;
 
@@ -44,22 +47,40 @@ export class gamescreenView {
         if (this.debrisRecords.length < MaxDebris) {
             const debrisRecord = this.debris.spawnDebris();
             const img = this.rockImages[Math.ceil(Math.random() * this.rockImages.length)];
+            const scale = .05;
+
             this.canvas.drawImage(
                 img,
                 this.earthPosition.x + debrisRecord.point.x,
                 this.earthPosition.y,
-                .05,
+                scale,
                 function (item: DrawCommand, time: number) {
                     debrisRecord.update(time * OrbitSpeedFactor);
-                    item[1] = this.earthPosition.x + debrisRecord.point.x;
-                    item[2] = this.earthPosition.y + debrisRecord.point.y;
-                }.bind(this)
-            );
+                    item[1] = this.earthPosition.x + (debrisRecord.point.x - (img.width / 2 * scale));
+                    item[2] = this.earthPosition.y + (debrisRecord.point.y - (img.height / 2 * scale));
 
-            this.debrisRecords.push([
-                debrisRecord,
-                this.canvas.drawList[this.canvas.drawList.length - 1]
-            ]);
+                    this.entry.simulate(
+                        item,
+                        time,
+                        debrisRecord,
+                        [ // AList of objects with which we are testing Entry
+                            { point: this.earthPosition, diameter: this.earthImages[0].width }
+                        ]
+                    );
+
+                    if (debrisRecord.mass <= 1) {
+                        this.canvas.ctx.fillStyle = "orange";
+                        const size = img.width * scale*2;
+
+                        this.canvas.ctx.fillRect(
+                            item[1]-img.width*scale/2,
+                            item[2]-img.width*scale/2,
+                            size, size
+                        );
+                    }
+                }.bind(this),
+                debrisRecord
+            )
         }
     }
 
@@ -70,27 +91,46 @@ export class gamescreenView {
         for (let drawCmd of this.canvas.backgroundDrawList) {
             this.drawIt(drawCmd, delta);
         }
-        for (let drawCmd of this.canvas.drawList) {
-            this.drawIt(drawCmd, delta);
+        const deleteList = [];
+        for (let drawCmdIndex in this.canvas.drawList) {
+            let drawCmd = this.canvas.drawList[drawCmdIndex];
+            if (drawCmd[6]) {
+                if (drawCmd[6].complete(drawCmd[6])) {
+                    deleteList.push(drawCmdIndex);
+                } else {
+                    this.drawIt(drawCmd, delta);
+                }
+            } else {
+                this.drawIt(drawCmd, delta);
+            }
         }
+        for (let index of deleteList) this.canvas.drawList.splice(index, 1);
+
+        // console.log("Object Count:", this.canvas.drawList.length, "background:", this.canvas.backgroundDrawList.length);
 
         requestAnimationFrame(this.animate.bind(this));
     }
 
     drawIt(drawCmd: DrawCommand, delta: number) {
         let item = drawCmd as unknown as DrawCommand;
-        const fn: Function = item.slice(-1)[0] as unknown as Function;
+        const fn: Function = item[5] as unknown as Function;
         fn(item, delta);
         // @ts-ignore
         this.canvas.ctx.drawImage(...item.slice(0, 5));
     };
 
-    getElements(): { canvas: CanvasController, debris: DebrisController } {
+    getElements(): {
+        canvas: CanvasController;
+        debris: DebrisController;
+        entry: EntryController;
+    } {
         const canvas = this.canvas = new CanvasController();
         const debris = this.debris = new DebrisController();
+        const entry = this.entry = new EntryController();
         return {
             canvas,
             debris,
+            entry,
         }
     }
 
