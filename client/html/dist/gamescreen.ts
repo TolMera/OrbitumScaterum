@@ -1,14 +1,21 @@
 import { CanvasController } from "./canvas.js";
-import type { DrawCommand, Point } from "./canvas.js";
+import type { DrawCommand } from "./canvas.js";
 
 import { DebrisController } from "./debris.js";
-import type { DebrisRecord } from "./debris.js";
 
 import { EntryController } from "./entry.js";
+import {
+	ObjectRecord,
+	OrbitSpeedFactor,
+	Point,
+	Vector,
+	calculateCircularOrbit,
+	update,
+} from "./gravity.js";
 
 export class gamescreenView {
 	debris: DebrisController;
-	debrisRecords: [DebrisRecord, unknown][] = [];
+	debrisRecords: [ObjectRecord, unknown][] = [];
 	canvas: CanvasController;
 	_elements: Record<string, any>;
 	entry: EntryController;
@@ -28,19 +35,95 @@ export class gamescreenView {
 
 	constructor() {
 		this.drawBackground();
-		this.preloadEarthImages();
-		setTimeout(this.drawEarth.bind(this), 5000);
+		this.preloadImages();
 
-		this.preloadRockImages();
+		setTimeout(this.drawEarth.bind(this), 5000);
 		setTimeout(this.spawnDebris.bind(this), 5000);
 
 		this.animate(0);
+
+		setTimeout(
+			function () {
+				this.spawnPlayer();
+			}.bind(this),
+			10000,
+		);
+	}
+
+	preloadImages() {
+		this.preloadEarthImages();
+		this.preloadRockImages();
+		this.preloadShipImage();
+	}
+
+	playerObject: ObjectRecord = this.spawnPlayerModel();
+	spawnPlayerModel() {
+		const point: Point = {
+			x: 5000,
+			y: 0,
+		};
+		const model: ObjectRecord = {
+			type: "ship",
+			mass: 100,
+			point,
+			vector: calculateCircularOrbit(point),
+
+			update,
+			complete: () => {},
+		};
+		return model;
+	}
+	spawnPlayer() {
+		const img = this.shipImages[1];
+		const scale = 1;
+
+		this.canvas.drawImage(
+			img,
+			0,
+			0,
+			scale,
+			function (item: DrawCommand, time: number) {
+				this.playerObject.update(this.playerObject, time * OrbitSpeedFactor);
+				item[1] =
+					this.earthPosition.x +
+					(this.playerObject.point.x - (img.width / 2) * scale);
+				item[2] =
+					this.earthPosition.y +
+					(this.playerObject.point.y - (img.height / 2) * scale);
+
+				this.entry.simulate(item, time, this.playerObject, [
+					// AList of objects with which we are testing Entry
+					{
+						point: this.earthPosition,
+						diameter: this.earthImages[0].width,
+					},
+				]);
+
+				if (this.playerObject.mass <= 1) {
+					this.canvas.ctx.fillStyle = "orange";
+					const size = img.width * scale * 2;
+
+					this.canvas.ctx.fillRect(
+						item[1] - (img.width * scale) / 2,
+						item[2] - (img.width * scale) / 2,
+						size,
+						size,
+					);
+				}
+
+				window.scrollTo({
+					left: item[1] - (window.innerWidth / 2) + (item[0].width/2),
+					top: item[2] - (window.innerHeight / 2) + (item[0].height/2),
+				  });
+				  
+			}.bind(this),
+			this.playerObject,
+		);
 	}
 
 	spawnDebris() {
 		const SpawnDebrisRate = 10;
 		const MaxDebris = 1000;
-		const OrbitSpeedFactor = 0.00005;
 
 		setTimeout(
 			this.spawnDebris.bind(this),
@@ -61,7 +144,7 @@ export class gamescreenView {
 				this.earthPosition.y,
 				scale,
 				function (item: DrawCommand, time: number) {
-					debrisRecord.update(time * OrbitSpeedFactor);
+					debrisRecord.update(debrisRecord, time * OrbitSpeedFactor);
 					item[1] =
 						this.earthPosition.x +
 						(debrisRecord.point.x - (img.width / 2) * scale);
@@ -83,7 +166,7 @@ export class gamescreenView {
 
 						this.canvas.ctx.fillRect(
 							item[1] - (img.width * scale) / 2,
-							item[2] - (img.width * scale) / 2,
+							item[2] - (img.height * scale) / 2,
 							size,
 							size,
 						);
@@ -108,10 +191,10 @@ export class gamescreenView {
 				if (drawCmd[6].complete(drawCmd[6])) {
 					deleteList.push(drawCmdIndex);
 				} else {
-					const thisDiam =
-						drawCmd[0].width *
-						0.05 *
-						Math.cbrt(drawCmd[6].mass / 10);
+					const thisDiam = drawCmd[3]
+						// drawCmd[0].width *
+						// 0.05 *
+						// Math.cbrt(drawCmd[6].mass / 10);
 					for (
 						let otherIndex = Number(drawCmdIndex) + 1;
 						Number(otherIndex) < this.canvas.drawList.length;
@@ -119,13 +202,13 @@ export class gamescreenView {
 					) {
 						const other = this.canvas.drawList[otherIndex];
 						if (other[6] && other[6].type === "debris") {
-							const otherDiam =
-								other[0].width *
-								0.05 *
-								Math.cbrt(other[6].mass / 10);
+							const otherDiam = other[3]
+								// other[0].width *
+								// 0.05 *
+								// Math.cbrt(other[6].mass / 10);
 							const distance = Math.sqrt(
 								Math.pow(other[1] - drawCmd[1], 2) +
-									Math.pow(other[2] - drawCmd[2], 2),
+								Math.pow(other[2] - drawCmd[2], 2),
 							);
 							if (distance < otherDiam + thisDiam) {
 								const thisPreMass = drawCmd[6].mass;
@@ -242,10 +325,19 @@ export class gamescreenView {
 			const img = this.elements.canvas.getImage(
 				`${framePath}${index.toString()}.png`,
 			);
-			img.onload = () => {
-				rockImages[index] = img;
-			};
+			img.onload = function () {
+				this.rockImages[index] = img;
+			}.bind(this);
 		}
+	}
+
+	shipImages: HTMLImageElement[] = [];
+	preloadShipImage() {
+		const framePath = "/media/ship/ship";
+		const img = this.elements.canvas.getImage(`${framePath}1.png`);
+		img.onload = function () {
+			this.shipImages[1] = img;
+		}.bind(this);
 	}
 }
 
