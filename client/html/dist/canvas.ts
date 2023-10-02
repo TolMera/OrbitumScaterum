@@ -1,7 +1,7 @@
 import { DebrisRecord } from "./debris";
 
 export type DrawCommand = [
-	CanvasImageSource,
+	HTMLImageElement,
 	number,
 	number,
 	number,

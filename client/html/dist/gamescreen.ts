@@ -53,7 +53,7 @@ export class gamescreenView {
 				this.rockImages[
 					Math.ceil(Math.random() * this.rockImages.length)
 				];
-			const scale = 0.05;
+			const scale = 0.05 * Math.cbrt(debrisRecord.mass/10);
 
 			this.canvas.drawImage(
 				img,
@@ -108,6 +108,17 @@ export class gamescreenView {
 				if (drawCmd[6].complete(drawCmd[6])) {
 					deleteList.push(drawCmdIndex);
 				} else {
+					// const thisDiam = (drawCmd[0].width * 0.05 * Math.cbrt(drawCmd[6].mass/10));
+					// for (let otherIndex = Number(drawCmdIndex)+1; Number(otherIndex) < this.canvas.drawList.length; otherIndex++) {
+						// const other = this.canvas.drawList[otherIndex];
+						// if (other[6] && other[6].type === "debris") {
+						// 	const otherDiam = (other[0].width * 0.05 * Math.cbrt(other[6].mass/10));
+						// 	const distance = Math.sqrt(Math.pow(other[1] - drawCmd[1], 2) + Math.pow(other[2] - drawCmd[2], 2));
+						// 	if (distance < otherDiam + thisDiam) {
+						// 		this.debris.collision(drawCmd[6], other[6]);
+						// 	}
+						// }
+					// }
 					this.drawIt(drawCmd, delta);
 				}
 			} else {
@@ -116,7 +127,7 @@ export class gamescreenView {
 		}
 		for (let index of deleteList) this.canvas.drawList.splice(index, 1);
 
-		// console.log("Object Count:", this.canvas.drawList.length, "background:", this.canvas.backgroundDrawList.length);
+		if (Math.random() > .9) console.log("Object Count:", this.canvas.drawList.length, "background:", this.canvas.backgroundDrawList.length);
 
 		requestAnimationFrame(this.animate.bind(this));
 	}
