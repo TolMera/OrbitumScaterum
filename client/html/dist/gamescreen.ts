@@ -10,8 +10,15 @@ import {
 	Point,
 	Vector,
 	calculateCircularOrbit,
+	rotateVector,
 	update,
 } from "./gravity.js";
+
+import GameStates from "./gamestates.js";
+import NetworkController from "./input/network.js";
+import { ShipController } from "./ship.js";
+
+import { InputMapping } from "./input/mapping.js";
 
 export class gamescreenView {
 	debris: DebrisController;
@@ -64,9 +71,14 @@ export class gamescreenView {
 		};
 		const model: ObjectRecord = {
 			type: "ship",
-			mass: 100,
+
 			point,
 			vector: calculateCircularOrbit(point),
+
+			heading: { x: 0, y: 1 },
+			spin: 0,
+
+			mass: 100,
 
 			update,
 			complete: () => {},
@@ -83,7 +95,10 @@ export class gamescreenView {
 			0,
 			scale,
 			function (item: DrawCommand, time: number) {
-				this.playerObject.update(this.playerObject, time * OrbitSpeedFactor);
+				this.playerObject.update(
+					this.playerObject,
+					time * OrbitSpeedFactor,
+				);
 				item[1] =
 					this.earthPosition.x +
 					(this.playerObject.point.x - (img.width / 2) * scale);
@@ -112,12 +127,16 @@ export class gamescreenView {
 				}
 
 				window.scrollTo({
-					left: item[1] - (window.innerWidth / 2) + (item[0].width/2),
-					top: item[2] - (window.innerHeight / 2) + (item[0].height/2),
-				  });
-				  
+					left: item[1] - window.innerWidth / 2 + item[0].width / 2,
+					top: item[2] - window.innerHeight / 2 + item[0].height / 2,
+				});
 			}.bind(this),
 			this.playerObject,
+		);
+
+		new ShipController(
+			new InputMapping(NetworkController),
+			Object.assign(this.playerObject, GameStates.ShipState),
 		);
 	}
 
@@ -130,7 +149,7 @@ export class gamescreenView {
 			Math.random() * SpawnDebrisRate,
 		);
 
-		if (this.debrisRecords.length < MaxDebris) {
+		if (this.canvas.drawList.length < MaxDebris) {
 			const debrisRecord = this.debris.spawnDebris();
 			const img =
 				this.rockImages[
@@ -184,6 +203,7 @@ export class gamescreenView {
 		for (let drawCmd of this.canvas.backgroundDrawList) {
 			this.drawIt(drawCmd, delta);
 		}
+
 		const deleteList = [];
 		for (let drawCmdIndex in this.canvas.drawList) {
 			let drawCmd = this.canvas.drawList[drawCmdIndex];
@@ -191,10 +211,7 @@ export class gamescreenView {
 				if (drawCmd[6].complete(drawCmd[6])) {
 					deleteList.push(drawCmdIndex);
 				} else {
-					const thisDiam = drawCmd[3]
-						// drawCmd[0].width *
-						// 0.05 *
-						// Math.cbrt(drawCmd[6].mass / 10);
+					const thisDiam = drawCmd[3];
 					for (
 						let otherIndex = Number(drawCmdIndex) + 1;
 						Number(otherIndex) < this.canvas.drawList.length;
@@ -202,13 +219,10 @@ export class gamescreenView {
 					) {
 						const other = this.canvas.drawList[otherIndex];
 						if (other[6] && other[6].type === "debris") {
-							const otherDiam = other[3]
-								// other[0].width *
-								// 0.05 *
-								// Math.cbrt(other[6].mass / 10);
+							const otherDiam = other[3];
 							const distance = Math.sqrt(
 								Math.pow(other[1] - drawCmd[1], 2) +
-								Math.pow(other[2] - drawCmd[2], 2),
+									Math.pow(other[2] - drawCmd[2], 2),
 							);
 							if (distance < otherDiam + thisDiam) {
 								const thisPreMass = drawCmd[6].mass;
@@ -250,8 +264,28 @@ export class gamescreenView {
 		let item = drawCmd as unknown as DrawCommand;
 		const fn: Function = item[5] as unknown as Function;
 		fn(item, delta);
+
+		this.canvas.ctx.save();
+		this.canvas.ctx.translate(item[1], item[2]);
+		if (item[6]) {
+			if (item[6].spin != 0) {
+				let r = rotateVector(item[6].heading, item[6].spin);
+				item[6].heading.x = r.x;
+				item[6].heading.y = r.y;
+			}
+
+			const angle = Math.atan2(item[6].heading.y, item[6].heading.x);
+			this.canvas.ctx.rotate(angle);
+		}
 		// @ts-ignore
-		this.canvas.ctx.drawImage(...item.slice(0, 5));
+		this.canvas.ctx.drawImage(
+			item[0],
+			-(item[0].width / 2),
+			-(item[0].height / 2),
+			item[3],
+			item[4],
+		);
+		this.canvas.ctx.restore();
 	}
 
 	getElements(): {
@@ -321,7 +355,6 @@ export class gamescreenView {
 		const framePath = "/media/rocks/";
 		for (let i = 1; i <= 10; i++) {
 			const index = i;
-			const rockImages = this.rockImages;
 			const img = this.elements.canvas.getImage(
 				`${framePath}${index.toString()}.png`,
 			);

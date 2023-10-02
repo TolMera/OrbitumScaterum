@@ -2,8 +2,13 @@ export type Point = { x: number; y: number };
 export type Vector = Point;
 export type ObjectRecord = {
 	type: string;
+
 	point: Point;
 	vector: Vector;
+
+	heading: Vector;
+	spin: number;
+
 	mass: number;
 	update: Function;
 	complete: Function;
@@ -33,4 +38,10 @@ export const calculateCircularOrbit = (point: Point) => {
 		x: 0,
 		y: Math.sqrt((G * M) / Math.abs(point.x)), // * (Math.random() > 0.5 ? -1 : 1),
 	};
+};
+
+export const rotateVector = (point: Point, radians: number) => {
+	const xPrime = point.x * Math.cos(radians) + point.y * Math.sin(radians);
+	const yPrime = -point.x * Math.sin(radians) + point.y * Math.cos(radians);
+	return { x: xPrime, y: yPrime };
 };

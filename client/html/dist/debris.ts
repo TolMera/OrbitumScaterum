@@ -64,10 +64,17 @@ export class DebrisModel {
 		const vector: Vector = calculateCircularOrbit(point);
 		const mass = Math.max(2, Number((Math.random() * 100).toFixed(0)));
 
-		const record = {
+		const heading: Vector = { x: 0, y: 1 };
+
+		const record: ObjectRecord = {
 			type: "debris",
+
 			point,
 			vector,
+
+			heading,
+			spin: 0,
+
 			mass,
 			update,
 			complete: (item: ObjectRecord) => {
