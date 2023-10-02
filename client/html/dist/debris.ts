@@ -39,13 +39,14 @@ export class DebrisController {
 				p1.vector.x =
 					p2.vector.x * (p2.mass / totalMass) +
 					p1.vector.x * (p1.mass / totalMass);
-				p2.vector.x = 0;
 				p1.vector.y =
 					p2.vector.y * (p2.mass / totalMass) +
 					p1.vector.y * (p1.mass / totalMass);
-				p2.vector.y = 0;
 
 				p1.mass += p2.mass;
+				
+				p2.vector.x = 0;
+				p2.vector.y = 0;
 				p2.mass = 0;
 			}
 		}

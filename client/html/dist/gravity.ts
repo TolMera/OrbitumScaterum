@@ -19,9 +19,7 @@ export const M = 5.972e24;
 export const OrbitSpeedFactor = 0.00005;
 
 export const update = (item: ObjectRecord, time: number) => {
-	const r = Math.sqrt(
-		item.point.x * item.point.x + item.point.y * item.point.y,
-	);
+	const r = Math.sqrt(Math.pow(item.point.x,2) + Math.pow(item.point.y,2));
 	let a = (G * M) / (r * r);
 
 	// Update velocity using acceleration
