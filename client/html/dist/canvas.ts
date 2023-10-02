@@ -1,4 +1,4 @@
-import { DebrisRecord } from "./debris";
+import { ObjectRecord, Point } from "./gravity.js";
 
 export type DrawCommand = [
 	HTMLImageElement,
@@ -9,7 +9,6 @@ export type DrawCommand = [
 	Function,
 	any?,
 ];
-export type Point = { x: number; y: number };
 
 export class CanvasController {
 	canvas: HTMLCanvasElement;
@@ -36,7 +35,7 @@ export class CanvasController {
 		y: number,
 		scale: number = 1,
 		fn: Function = () => {},
-		model?: DebrisRecord,
+		model?: ObjectRecord,
 	): DrawCommand {
 		const img =
 			typeof filePath === "string" ? this.getImage(filePath) : filePath;

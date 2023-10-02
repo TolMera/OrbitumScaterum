@@ -1,11 +1,11 @@
-import { DrawCommand, Point } from "./canvas";
-import type { DebrisRecord } from "./debris";
+import { DrawCommand } from "./canvas.js";
+import { ObjectRecord, Point } from "./gravity.js";
 
 export class EntryController {
 	simulate(
 		item: DrawCommand,
 		time: number,
-		record: DebrisRecord,
+		record: ObjectRecord,
 		bodies: { point: Point; diameter: number }[],
 	) {
 		const BurnupStartsAt = 2;

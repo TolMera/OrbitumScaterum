@@ -1,14 +1,28 @@
 import { CanvasController } from "./canvas.js";
-import type { DrawCommand, Point } from "./canvas.js";
+import type { DrawCommand } from "./canvas.js";
 
 import { DebrisController } from "./debris.js";
-import type { DebrisRecord } from "./debris.js";
 
 import { EntryController } from "./entry.js";
+import {
+	ObjectRecord,
+	OrbitSpeedFactor,
+	Point,
+	Vector,
+	calculateCircularOrbit,
+	rotateVector,
+	update,
+} from "./gravity.js";
+
+import GameStates from "./gamestates.js";
+import NetworkController from "./input/network.js";
+import { ShipController } from "./ship.js";
+
+import { InputMapping } from "./input/mapping.js";
 
 export class gamescreenView {
 	debris: DebrisController;
-	debrisRecords: [DebrisRecord, unknown][] = [];
+	debrisRecords: [ObjectRecord, unknown][] = [];
 	canvas: CanvasController;
 	_elements: Record<string, any>;
 	entry: EntryController;
@@ -28,26 +42,102 @@ export class gamescreenView {
 
 	constructor() {
 		this.drawBackground();
-		this.preloadEarthImages();
-		setTimeout(this.drawEarth.bind(this), 5000);
+		this.preloadImages();
 
-		this.preloadRockImages();
+		setTimeout(this.drawEarth.bind(this), 5000);
 		setTimeout(this.spawnDebris.bind(this), 5000);
 
 		this.animate(0);
+
+		setTimeout(
+			function () {
+				this.spawnPlayer();
+			}.bind(this),
+			10000,
+		);
+	}
+
+	preloadImages() {
+		this.preloadEarthImages();
+		this.preloadRockImages();
+		this.preloadShipImage();
+	}
+
+	playerObject: ObjectRecord = this.spawnPlayerModel();
+	spawnPlayerModel() {
+		const point: Point = {
+			x: 5000,
+			y: 0,
+		};
+		const model: ObjectRecord = {
+			type: "ship",
+
+			point,
+			vector: calculateCircularOrbit(point),
+
+			heading: { x: 0, y: 1 },
+			spin: 0,
+
+			mass: 100,
+
+			update,
+			complete: () => {},
+		};
+		return model;
+	}
+	spawnPlayer() {
+		const img = this.shipImages[1];
+		const scale = 1;
+
+		this.canvas.drawImage(
+			img,
+			0,
+			0,
+			scale,
+			function (item: DrawCommand, time: number) {
+				this.playerObject.update(
+					this.playerObject,
+					time * OrbitSpeedFactor,
+				);
+				item[1] = this.earthPosition.x + this.playerObject.point.x;
+				item[2] = this.earthPosition.y + this.playerObject.point.y;
+
+				this.entry.simulate(item, time, this.playerObject, [
+					// AList of objects with which we are testing Entry
+					{
+						point: this.earthPosition,
+						diameter: this.earthImages[0].width,
+					},
+				]);
+
+				if (this.playerObject.mass <= 1) {
+					this.burnAnimation(item, scale);
+				}
+
+				window.scrollTo({
+					left: item[1] - window.innerWidth / 2,
+					top: item[2] - window.innerHeight / 2,
+				});
+			}.bind(this),
+			this.playerObject,
+		);
+
+		new ShipController(
+			new InputMapping(NetworkController),
+			Object.assign(this.playerObject, GameStates.ShipState),
+		);
 	}
 
 	spawnDebris() {
 		const SpawnDebrisRate = 10;
 		const MaxDebris = 1000;
-		const OrbitSpeedFactor = 0.00005;
 
 		setTimeout(
 			this.spawnDebris.bind(this),
 			Math.random() * SpawnDebrisRate,
 		);
 
-		if (this.debrisRecords.length < MaxDebris) {
+		if (this.canvas.drawList.length < MaxDebris) {
 			const debrisRecord = this.debris.spawnDebris();
 			const img =
 				this.rockImages[
@@ -58,18 +148,18 @@ export class gamescreenView {
 			this.canvas.drawImage(
 				img,
 				this.earthPosition.x + debrisRecord.point.x,
-				this.earthPosition.y,
+				this.earthPosition.y + debrisRecord.point.y,
 				scale,
 				function (item: DrawCommand, time: number) {
-					debrisRecord.update(time * OrbitSpeedFactor);
+					item[6].update(item[6], time * OrbitSpeedFactor);
 					item[1] =
 						this.earthPosition.x +
-						(debrisRecord.point.x - (img.width / 2) * scale);
+						(item[6].point.x - (item[0].width / 2) * scale);
 					item[2] =
 						this.earthPosition.y +
-						(debrisRecord.point.y - (img.height / 2) * scale);
+						(item[6].point.y - (item[0].height / 2) * scale);
 
-					this.entry.simulate(item, time, debrisRecord, [
+					this.entry.simulate(item, time, item[6], [
 						// AList of objects with which we are testing Entry
 						{
 							point: this.earthPosition,
@@ -77,21 +167,25 @@ export class gamescreenView {
 						},
 					]);
 
-					if (debrisRecord.mass <= 1) {
-						this.canvas.ctx.fillStyle = "orange";
-						const size = img.width * scale * 2;
-
-						this.canvas.ctx.fillRect(
-							item[1] - (img.width * scale) / 2,
-							item[2] - (img.width * scale) / 2,
-							size,
-							size,
-						);
+					if (item[6].mass <= 1) {
+						this.burnAnimation(item, scale);
 					}
 				}.bind(this),
 				debrisRecord,
 			);
 		}
+	}
+
+	burnAnimation(item: DrawCommand, scale: number) {
+		this.canvas.ctx.fillStyle = "orange";
+		const size = item[0].width * scale * 2;
+
+		this.canvas.ctx.fillRect(
+			item[1] - size / 2,
+			item[2] - size / 2,
+			size,
+			size,
+		);
 	}
 
 	lastTimestamp: number = 0;
@@ -101,17 +195,15 @@ export class gamescreenView {
 		for (let drawCmd of this.canvas.backgroundDrawList) {
 			this.drawIt(drawCmd, delta);
 		}
+
 		const deleteList = [];
 		for (let drawCmdIndex in this.canvas.drawList) {
 			let drawCmd = this.canvas.drawList[drawCmdIndex];
 			if (drawCmd[6]) {
-				if (drawCmd[6].complete(drawCmd[6])) {
+				if (drawCmd[6]?.complete && drawCmd[6]?.complete(drawCmd[6])) {
 					deleteList.push(drawCmdIndex);
 				} else {
-					const thisDiam =
-						drawCmd[0].width *
-						0.05 *
-						Math.cbrt(drawCmd[6].mass / 10);
+					const thisDiam = drawCmd[3];
 					for (
 						let otherIndex = Number(drawCmdIndex) + 1;
 						Number(otherIndex) < this.canvas.drawList.length;
@@ -119,10 +211,7 @@ export class gamescreenView {
 					) {
 						const other = this.canvas.drawList[otherIndex];
 						if (other[6] && other[6].type === "debris") {
-							const otherDiam =
-								other[0].width *
-								0.05 *
-								Math.cbrt(other[6].mass / 10);
+							const otherDiam = other[3];
 							const distance = Math.sqrt(
 								Math.pow(other[1] - drawCmd[1], 2) +
 									Math.pow(other[2] - drawCmd[2], 2),
@@ -167,8 +256,30 @@ export class gamescreenView {
 		let item = drawCmd as unknown as DrawCommand;
 		const fn: Function = item[5] as unknown as Function;
 		fn(item, delta);
+
+		this.canvas.ctx.save();
+		this.canvas.ctx.translate(item[1], item[2]);
+		if (item[6]) {
+			if (item[6]?.heading) {
+				if (item[6]?.spin) {
+					let r = rotateVector(item[6].heading, item[6].spin);
+					item[6].heading.x = r.x;
+					item[6].heading.y = r.y;
+				}
+
+				const angle = Math.atan2(item[6].heading.y, item[6].heading.x);
+				this.canvas.ctx.rotate(angle);
+			}
+		}
 		// @ts-ignore
-		this.canvas.ctx.drawImage(...item.slice(0, 5));
+		this.canvas.ctx.drawImage(
+			item[0],
+			item[6]?.type === "earth" ? 0 : -(item[0].width / 2),
+			item[6]?.type === "earth" ? 0 : -(item[0].height / 2),
+			item[3],
+			item[4],
+		);
+		this.canvas.ctx.restore();
 	}
 
 	getElements(): {
@@ -200,21 +311,22 @@ export class gamescreenView {
 	drawEarth() {
 		this.earthSecondsToRotation = this.elements.canvas.canvas.width / 20;
 
-		const fn = function (item: DrawCommand, time: number) {
-			this.earthSecondsPassed += time;
-			if (this.earthSecondsPassed > this.earthSecondsToRotation) {
-				if (++this.earthFrame > 19) this.earthFrame = 0;
-				this.earthSecondsPassed -= this.earthSecondsToRotation;
-				item[0] = this.earthImages[this.earthFrame];
-			}
-		}.bind(this);
-
 		this.elements.canvas.drawImage(
 			this.earthImages[0],
 			this.earthPosition.x,
 			this.earthPosition.y,
 			1,
-			fn,
+			function (item: DrawCommand, time: number) {
+				this.earthSecondsPassed += time;
+				if (this.earthSecondsPassed > this.earthSecondsToRotation) {
+					if (++this.earthFrame > 19) this.earthFrame = 0;
+					this.earthSecondsPassed -= this.earthSecondsToRotation;
+					item[0] = this.earthImages[this.earthFrame];
+				}
+			}.bind(this),
+			{
+				type: "earth",
+			},
 		);
 		console.log("Draw Earth");
 	}
@@ -238,14 +350,22 @@ export class gamescreenView {
 		const framePath = "/media/rocks/";
 		for (let i = 1; i <= 10; i++) {
 			const index = i;
-			const rockImages = this.rockImages;
 			const img = this.elements.canvas.getImage(
 				`${framePath}${index.toString()}.png`,
 			);
-			img.onload = () => {
-				rockImages[index] = img;
-			};
+			img.onload = function () {
+				this.rockImages[index] = img;
+			}.bind(this);
 		}
+	}
+
+	shipImages: HTMLImageElement[] = [];
+	preloadShipImage() {
+		const framePath = "/media/ship/ship";
+		const img = this.elements.canvas.getImage(`${framePath}1.png`);
+		img.onload = function () {
+			this.shipImages[1] = img;
+		}.bind(this);
 	}
 }
 
