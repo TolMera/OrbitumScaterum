@@ -99,12 +99,8 @@ export class gamescreenView {
 					this.playerObject,
 					time * OrbitSpeedFactor,
 				);
-				item[1] =
-					this.earthPosition.x +
-					(this.playerObject.point.x - (img.width / 2) * scale);
-				item[2] =
-					this.earthPosition.y +
-					(this.playerObject.point.y - (img.height / 2) * scale);
+				item[1] = this.earthPosition.x + this.playerObject.point.x;
+				item[2] = this.earthPosition.y + this.playerObject.point.y;
 
 				this.entry.simulate(item, time, this.playerObject, [
 					// AList of objects with which we are testing Entry
@@ -115,20 +111,12 @@ export class gamescreenView {
 				]);
 
 				if (this.playerObject.mass <= 1) {
-					this.canvas.ctx.fillStyle = "orange";
-					const size = img.width * scale * 2;
-
-					this.canvas.ctx.fillRect(
-						item[1] - (img.width * scale) / 2,
-						item[2] - (img.width * scale) / 2,
-						size,
-						size,
-					);
+					this.burnAnimation(item, scale);
 				}
 
 				window.scrollTo({
-					left: item[1] - window.innerWidth / 2 + item[0].width / 2,
-					top: item[2] - window.innerHeight / 2 + item[0].height / 2,
+					left: item[1] - window.innerWidth / 2,
+					top: item[2] - window.innerHeight / 2,
 				});
 			}.bind(this),
 			this.playerObject,
@@ -160,18 +148,18 @@ export class gamescreenView {
 			this.canvas.drawImage(
 				img,
 				this.earthPosition.x + debrisRecord.point.x,
-				this.earthPosition.y,
+				this.earthPosition.y + debrisRecord.point.y,
 				scale,
 				function (item: DrawCommand, time: number) {
-					debrisRecord.update(debrisRecord, time * OrbitSpeedFactor);
+					item[6].update(item[6], time * OrbitSpeedFactor);
 					item[1] =
 						this.earthPosition.x +
-						(debrisRecord.point.x - (img.width / 2) * scale);
+						(item[6].point.x - (item[0].width / 2) * scale);
 					item[2] =
 						this.earthPosition.y +
-						(debrisRecord.point.y - (img.height / 2) * scale);
+						(item[6].point.y - (item[0].height / 2) * scale);
 
-					this.entry.simulate(item, time, debrisRecord, [
+					this.entry.simulate(item, time, item[6], [
 						// AList of objects with which we are testing Entry
 						{
 							point: this.earthPosition,
@@ -179,21 +167,25 @@ export class gamescreenView {
 						},
 					]);
 
-					if (debrisRecord.mass <= 1) {
-						this.canvas.ctx.fillStyle = "orange";
-						const size = img.width * scale * 2;
-
-						this.canvas.ctx.fillRect(
-							item[1] - (img.width * scale) / 2,
-							item[2] - (img.height * scale) / 2,
-							size,
-							size,
-						);
+					if (item[6].mass <= 1) {
+						this.burnAnimation(item, scale);
 					}
 				}.bind(this),
 				debrisRecord,
 			);
 		}
+	}
+
+	burnAnimation(item: DrawCommand, scale: number) {
+		this.canvas.ctx.fillStyle = "orange";
+		const size = item[0].width * scale * 2;
+
+		this.canvas.ctx.fillRect(
+			item[1] - size / 2,
+			item[2] - size / 2,
+			size,
+			size,
+		);
 	}
 
 	lastTimestamp: number = 0;
@@ -208,7 +200,7 @@ export class gamescreenView {
 		for (let drawCmdIndex in this.canvas.drawList) {
 			let drawCmd = this.canvas.drawList[drawCmdIndex];
 			if (drawCmd[6]) {
-				if (drawCmd[6].complete(drawCmd[6])) {
+				if (drawCmd[6]?.complete && drawCmd[6]?.complete(drawCmd[6])) {
 					deleteList.push(drawCmdIndex);
 				} else {
 					const thisDiam = drawCmd[3];
@@ -268,20 +260,22 @@ export class gamescreenView {
 		this.canvas.ctx.save();
 		this.canvas.ctx.translate(item[1], item[2]);
 		if (item[6]) {
-			if (item[6].spin != 0) {
-				let r = rotateVector(item[6].heading, item[6].spin);
-				item[6].heading.x = r.x;
-				item[6].heading.y = r.y;
-			}
+			if (item[6]?.heading) {
+				if (item[6]?.spin) {
+					let r = rotateVector(item[6].heading, item[6].spin);
+					item[6].heading.x = r.x;
+					item[6].heading.y = r.y;
+				}
 
-			const angle = Math.atan2(item[6].heading.y, item[6].heading.x);
-			this.canvas.ctx.rotate(angle);
+				const angle = Math.atan2(item[6].heading.y, item[6].heading.x);
+				this.canvas.ctx.rotate(angle);
+			}
 		}
 		// @ts-ignore
 		this.canvas.ctx.drawImage(
 			item[0],
-			-(item[0].width / 2),
-			-(item[0].height / 2),
+			item[6]?.type === "earth" ? 0 : -(item[0].width / 2),
+			item[6]?.type === "earth" ? 0 : -(item[0].height / 2),
 			item[3],
 			item[4],
 		);
@@ -317,21 +311,22 @@ export class gamescreenView {
 	drawEarth() {
 		this.earthSecondsToRotation = this.elements.canvas.canvas.width / 20;
 
-		const fn = function (item: DrawCommand, time: number) {
-			this.earthSecondsPassed += time;
-			if (this.earthSecondsPassed > this.earthSecondsToRotation) {
-				if (++this.earthFrame > 19) this.earthFrame = 0;
-				this.earthSecondsPassed -= this.earthSecondsToRotation;
-				item[0] = this.earthImages[this.earthFrame];
-			}
-		}.bind(this);
-
 		this.elements.canvas.drawImage(
 			this.earthImages[0],
 			this.earthPosition.x,
 			this.earthPosition.y,
 			1,
-			fn,
+			function (item: DrawCommand, time: number) {
+				this.earthSecondsPassed += time;
+				if (this.earthSecondsPassed > this.earthSecondsToRotation) {
+					if (++this.earthFrame > 19) this.earthFrame = 0;
+					this.earthSecondsPassed -= this.earthSecondsToRotation;
+					item[0] = this.earthImages[this.earthFrame];
+				}
+			}.bind(this),
+			{
+				type: "earth",
+			},
 		);
 		console.log("Draw Earth");
 	}
