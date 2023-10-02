@@ -8,24 +8,39 @@ export class DebrisController {
 	}
 
 	collision(p1: DebrisRecord, p2: DebrisRecord) {
-		let main: DebrisRecord;
-		let second: DebrisRecord;
-		if (p1.mass > p2.mass) {
-			main = p1;
-			second = p2;
-		} else {
-			main = p2;
-			second = p1;
+		if (!(p1.type === "debris" && p2.type === "debris")) return;
+
+		let tactic: string = "merge";
+		if (p1.mass + p2.mass > 1000) {
+			tactic = "biggerRockWins";
 		}
 
-		const totalMass = main.mass + second.mass;
-		main.vector.x = (second.vector.x * (second.mass/totalMass)) + (main.vector.x * (main.mass/totalMass));
-		second.vector.x = 0;
-		main.vector.y = (second.vector.y * (second.mass/totalMass)) + (main.vector.y * (main.mass/totalMass));
-		second.vector.y = 0;
+		switch (tactic) {
+			case "biggerRockWins": {
+				if (p1.mass > p2.mass) {
+					p2.mass = 0;
+				} else {
+					p1.mass = 0;
+				}
+			}
 
-		main.mass += second.mass;
-		second.mass = 0;
+			case "merge": {
+				if (!(p1.type === "debris" && p2.type === "debris")) return;
+
+				const totalMass = p1.mass + p2.mass;
+				p1.vector.x =
+					p2.vector.x * (p2.mass / totalMass) +
+					p1.vector.x * (p1.mass / totalMass);
+				p2.vector.x = 0;
+				p1.vector.y =
+					p2.vector.y * (p2.mass / totalMass) +
+					p1.vector.y * (p1.mass / totalMass);
+				p2.vector.y = 0;
+
+				p1.mass += p2.mass;
+				p2.mass = 0;
+			}
+		}
 	}
 }
 
@@ -35,7 +50,7 @@ const G = 6.6743e-11;
 const M = 5.972e24;
 
 export type DebrisRecord = {
-	type: string,
+	type: string;
 	point: Point;
 	vector: Vector;
 	mass: number;
@@ -54,11 +69,10 @@ export class DebrisModel {
 		};
 		const vector: Vector = {
 			x: 0,
-			y:
-				Math.sqrt((G * M) / Math.abs(point.x)) *
-				(Math.random() > 0.5 ? -1 : 1),
+			y: Math.sqrt((G * M) / Math.abs(point.x)),
+			// * (Math.random() > 0.5 ? -1 : 1),
 		};
-		const mass = Math.max(2, Number((Math.random() * 1000).toFixed(0)));
+		const mass = Math.max(2, Number((Math.random() * 100).toFixed(0)));
 
 		const update = function (time: number) {
 			const r = Math.sqrt(point.x * point.x + point.y * point.y);
