@@ -81,6 +81,7 @@ export class CanvasController {
 						if (item[1] > 0) item[1] = 0 - this.canvas.width;
 						this.ctx.drawImage(...item.slice(0, 5));
 					}.bind(this),
+					{ type: "background" },
 				],
 				[
 					img,
@@ -93,6 +94,7 @@ export class CanvasController {
 						if (item[1] > this.canvas.width) item[1] = 0;
 						this.ctx.drawImage(...item.slice(0, 5));
 					}.bind(this),
+					{ type: "background" },
 				],
 			);
 		};
