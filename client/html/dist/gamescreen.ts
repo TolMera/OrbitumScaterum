@@ -189,7 +189,11 @@ export class gamescreenView {
 	}
 
 	lastTimestamp: number = 0;
+	lastDrawCmdIndex: number = 0;
+	lastOtherIndex: number = 0;
 	animate(time: number) {
+		const animateStartTime = performance.now() + 50;
+
 		const delta = (time - this.lastTimestamp) / 100;
 		this.lastTimestamp = time;
 		for (let drawCmd of this.canvas.backgroundDrawList) {
@@ -198,6 +202,9 @@ export class gamescreenView {
 
 		const deleteList = [];
 		for (let drawCmdIndex in this.canvas.drawList) {
+			if (Number(drawCmdIndex) < this.lastDrawCmdIndex) continue;
+			if (performance.now() > animateStartTime) break;
+
 			let drawCmd = this.canvas.drawList[drawCmdIndex];
 			if (drawCmd[6]) {
 				if (drawCmd[6]?.complete && drawCmd[6]?.complete(drawCmd[6])) {
@@ -209,37 +216,23 @@ export class gamescreenView {
 						Number(otherIndex) < this.canvas.drawList.length;
 						otherIndex++
 					) {
-						const other = this.canvas.drawList[otherIndex];
-						if (other[6] && other[6].type === "debris") {
-							const otherDiam = other[3];
-							const distance = Math.sqrt(
-								Math.pow(other[1] - drawCmd[1], 2) +
-									Math.pow(other[2] - drawCmd[2], 2),
-							);
-							if (distance < otherDiam + thisDiam) {
-								const thisPreMass = drawCmd[6].mass;
-								const otherPreMass = other[6].mass;
-								this.debris.collision(drawCmd[6], other[6]);
-								if (thisPreMass < drawCmd[6].mass) {
-									drawCmd[3] =
-										0.05 * Math.cbrt(drawCmd[6].mass / 10);
-									drawCmd[4] = drawCmd[3];
-								}
-								if (otherPreMass < other[6].mass) {
-									other[3] =
-										0.05 * Math.cbrt(other[6].mass / 10);
-									other[4] = other[3];
-								}
-							}
-						}
+						if (Number(otherIndex) < this.lastOtherIndex) continue;
+						if (performance.now() > animateStartTime) break;
+						this.debrisCollision(otherIndex, drawCmd, thisDiam);
+						this.lastOtherIndex = otherIndex;
 					}
+					if (this.lastOtherIndex === this.canvas.drawList.length -1) this.lastOtherIndex = 0;
 					this.drawIt(drawCmd, delta);
 				}
 			} else {
 				this.drawIt(drawCmd, delta);
 			}
+			this.lastDrawCmdIndex = Number(drawCmdIndex);
 		}
-		for (let index of deleteList) this.canvas.drawList.splice(index, 1);
+		if (this.lastDrawCmdIndex === this.canvas.drawList.length -1) this.lastDrawCmdIndex = 0;
+		for (let index of deleteList) {
+			this.canvas.drawList.splice(index, 1);
+		}
 
 		if (Math.random() > 0.9)
 			console.log(
@@ -250,6 +243,32 @@ export class gamescreenView {
 			);
 
 		requestAnimationFrame(this.animate.bind(this));
+	}
+
+	private debrisCollision(otherIndex: number, drawCmd: DrawCommand, thisDiam: number) {
+		const other = this.canvas.drawList[otherIndex];
+		if (other[6] && other[6].type === "debris") {
+			const otherDiam = other[3];
+			const distance = Math.sqrt(
+				Math.pow(other[1] - drawCmd[1], 2) +
+				Math.pow(other[2] - drawCmd[2], 2)
+			);
+			if (distance < otherDiam + thisDiam) {
+				const thisPreMass = drawCmd[6].mass;
+				const otherPreMass = other[6].mass;
+				this.debris.collision(drawCmd[6], other[6]);
+				if (thisPreMass < drawCmd[6].mass) {
+					drawCmd[3] =
+						0.05 * Math.cbrt(drawCmd[6].mass / 10);
+					drawCmd[4] = drawCmd[3];
+				}
+				if (otherPreMass < other[6].mass) {
+					other[3] =
+						0.05 * Math.cbrt(other[6].mass / 10);
+					other[4] = other[3];
+				}
+			}
+		}
 	}
 
 	drawIt(drawCmd: DrawCommand, delta: number) {
